@@ -1,0 +1,42 @@
+#!/bin/bash 
+
+function help(){
+	echo This program is to qsub the file. If the queue is full, it will will check every two minutes whether the queue is full or not. If the queue is not full. The progrom will qsub the file. 
+	echo Usage:
+	echo nohup queuesub sub.sh \>out 2\>err \&
+	echo The \'nohup\' is needed. 
+	echo The \'\&\' is needed, too.
+}
+
+if [ "$1" == "" -o "$1" == "-h" ];then
+	help
+	exit 0
+fi
+
+for file in $@
+do
+export file
+echo We want to sub the file: $file
+if [ ! -f $file ];then
+	echo There is no file called $file
+	help
+	break
+fi
+
+export queue=`cat $file|grep -Po '(?<=PBS -q )[cg]puq'`
+echo The queue is $queue
+que=`qstat|grep -c $queue`
+run=`qstat|grep -c "R $queue"`
+
+#This is the wait
+while [ $((que-run)) -gt 1 ]
+do
+	sleep 2m
+	echo The date is $(date)
+	que=`qstat|grep -c $queue`
+	run=`qstat|grep -c "R $queue"`
+done
+#sub the file
+qsub $file
+done
+exit 0
