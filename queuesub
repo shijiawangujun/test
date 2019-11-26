@@ -13,30 +13,45 @@ if [ "$1" == "" -o "$1" == "-h" ];then
 	exit 0
 fi
 
+location=$PWD
+
 for file in $@
 do
-export file
-echo We want to sub the file: $file
-if [ ! -f $file ];then
-	echo There is no file called $file
-	help
-	break
-fi
+	export file
+	echo We want to sub the file: $file
+	if [ ! -f $file ];then
+		echo There is no file called $file
+		help
+		break
+	fi
 
-export queue=`cat $file|grep -Po '(?<=PBS -q )[cg]puq'`
-echo The queue is $queue
-que=`qstat|grep -c $queue`
-run=`qstat|grep -c "R $queue"`
-
-#This is the wait
-while [ $((que-run)) -gt 1 ]
-do
-	sleep 2m
-	echo The date is $(date)
+	export queue=`cat $file|grep -Po '(?<=PBS -q )[cg]puq'`
+	echo The queue is $queue
 	que=`qstat|grep -c $queue`
 	run=`qstat|grep -c "R $queue"`
+
+	if [ "${queue}" == "gpuq" ];then
+		max_que=1
+	elif [ "${queue}" == "cpuq" ];then
+		max_que=3
+	else
+		help
+		exit 1
+	fi
+
+	#This is the wait
+	while [ $((que-run)) -gt ${max_que} ]
+	do
+		sleep 2m
+		echo The date is $(date)
+		que=`qstat|grep -c $queue`
+		run=`qstat|grep -c "R $queue"`
+	done
+
+	#sub the file
+	cd $(dirname $file)
+	qsub $(basename $file)
+	cd $location
 done
-#sub the file
-qsub $file
-done
+
 exit 0
